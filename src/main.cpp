@@ -3,15 +3,17 @@
 // #include "encoders/esp32hwencoder/ESP32HWEncoder.h"
 #include "current_sense/hardware_specific/esp32/esp32_i2s_driver.h"
 
+#include "board.h"
+
 HFIBLDCMotor motor2 = HFIBLDCMotor(7, 0.5f, 640.0f);
 
-// BLDCDriver3PWM driver2 = BLDCDriver3PWM(26, 27, 14, 12); // normal channel 2
-// LowsideCurrentSense current_sensor2 = LowsideCurrentSense(0.01f, 50.0f, 35, 34); // normal channel 2
+// BLDCDriver3PWM driver2 = BLDCDriver3PWM(A1, B1, C1); // normal channel 2
+// LowsideCurrentSense current_sensor2 = LowsideCurrentSense(0.01f, 50.0f, I_A1, I_B1); // normal channel 2
 
-BLDCDriver3PWM driver2 = BLDCDriver3PWM(26, 27, 33, 12); // channel 2, but phase c connected to B1, to use 3x current sensing
-LowsideCurrentSense current_sensor2 = LowsideCurrentSense(0.01f, 50.0f, 35, 34, 36); // channel 2, but phase c connected to B1, to use 3x current sensing
+BLDCDriver3PWM driver2 = BLDCDriver3PWM(A1, B1, B0); // channel 2, but phase c connected to B1, to use 3x current sensing
+LowsideCurrentSense current_sensor2 = LowsideCurrentSense(0.01f, 50.0f, I_A1, I_B1, I_B0); // channel 2, but phase c connected to B1, to use 3x current sensing
 
-// ESP32HWEncoder sensor2 = ESP32HWEncoder(5, 23, 1024, 13); 
+// ESP32HWEncoder sensor2 = ESP32HWEncoder(SCL_1, SDA_1, 1024, I_1); 
 
 void IRAM_ATTR process_hfi(){
   motor2.process_hfi();
