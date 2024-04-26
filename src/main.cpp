@@ -15,6 +15,53 @@ LowsideCurrentSense current_sensor2 = LowsideCurrentSense(0.01f, 50.0f, I_A1, I_
 
 // ESP32HWEncoder sensor2 = ESP32HWEncoder(SCL_1, SDA_1, 1024, I_1); 
 
+// Commander
+Commander command = Commander(Serial);
+void onMotor(char* cmd){command.motor(&motor2,cmd);}
+
+float lqtarget = 0.5 * 3.38e-3f;
+float ldq_div = (0.5 * 2.75e-3f) / lqtarget;
+float dohfivolts = 1.0f;
+#define MIN_L (2e-6f)
+#define MAX_L (50e-3f)
+#define MAX_DIFF 1.5f
+#define MIN_DIFF 0.5f
+#define MAX_HFI_V 10.0f
+#define MIN_HFI_V 0.01f
+
+// Set motor2 Lq directly and set Ld to the diffs percentage of Lq
+void doLq(char* cmd) { 
+  command.scalar(&lqtarget, cmd); 
+  if (lqtarget <= MAX_L && lqtarget >= MIN_L && (lqtarget * ldq_div) <= MAX_L && (lqtarget * ldq_div) >= MIN_L)
+  {
+    motor2.Lq = lqtarget;
+    motor2.Ld = lqtarget * ldq_div;
+  } 
+}
+
+// Set Lq to the same value as before and change the percentage of Lq that Ld is, (Parameter = Ld/Lq)
+void doLd_div_Lq(char* cmd) { 
+  command.scalar(&ldq_div, cmd); 
+  if(ldq_div <= MAX_DIFF && ldq_div >= MIN_DIFF) {
+    if (lqtarget <= MAX_L && lqtarget >= MIN_L && (lqtarget * ldq_div) <= MAX_L && (lqtarget * ldq_div) >= MIN_L)
+    {
+      motor2.Lq = lqtarget;
+      motor2.Ld = lqtarget * ldq_div;
+    }
+  }
+}
+
+// Set motor2 Lq directly and set Ld to the diffs percentage of Lq
+void doHfiV(char* cmd) { 
+  command.scalar(&dohfivolts, cmd); 
+  if (dohfivolts <= MAX_HFI_V && dohfivolts >= MIN_HFI_V)
+  {
+    motor2.hfi_v = dohfivolts;
+  }
+}
+
+// end Commander
+
 void IRAM_ATTR process_hfi(){
   motor2.process_hfi();
 }
@@ -51,6 +98,13 @@ void setup() {
 
   Serial.println("Init Current sense");
   current_sensor2.init();
+
+  // add custom commands to Commander
+  command.add('M',&onMotor,"motor");
+  command.add('Q', doLq, "set Lq = arg ; set Ld = arg * diff");
+  command.add('D', doLd_div_Lq, "Change diff: set Lq = Lq ; set Ld = Lq * arg");
+  command.add('H', doHfiV, "change hfi injection voltage between 0.01v and 10v");
+  command.decimal_places = 6;
 
   // set torque mode:
   // TorqueControlType::dc_current
@@ -96,6 +150,12 @@ void setup() {
   motor2.hfi_v = 2.0f;
 
   motor2.target = 0.0f;
+
+  // preset Commander variables to actual values
+  dohfivolts = motor2.hfi_v;
+  lqtarget = motor2.Lq;
+  ldq_div = motor2.Ld / motor2.Lq;
+
 }
 
 int cnt = 0;
@@ -116,7 +176,9 @@ void loop() {
 
   if(cnt > 1000){
     // printdbg(); // ADC Debug
-    
+
+    command.run(); // Commander
+
     // sensor2.update();
 
     // Teleplot printing:
@@ -128,10 +190,11 @@ void loop() {
    
     // Serial.printf(">Iq2:%f\n", (motor2.current_high.q + motor2.current_low.q)/2);
     // Serial.printf(">Id2:%f\n", (motor2.current_high.d + motor2.current_low.d)/2);
-
-    // Serial.printf(">Ia2:%f\n", current_sensor2.getPhaseCurrents().a);
-    // Serial.printf(">Ib2:%f\n", current_sensor2.getPhaseCurrents().b);
-    // Serial.printf(">Ic2:%f\n", current_sensor2.getPhaseCurrents().c);
+    
+    // PhaseCurrent_s currents = current_sensor2.getPhaseCurrents();
+    // Serial.printf(">Ia2:%f\n", currents.a);
+    // Serial.printf(">Ib2:%f\n", currents.b);
+    // Serial.printf(">Ic2:%f\n", currents.c);
 
     // Serial.printf(">Ua2:%f\n", motor2.Ua);
     // Serial.printf(">Ub2:%f\n", motor2.Ub);
